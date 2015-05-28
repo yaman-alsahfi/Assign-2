@@ -50,7 +50,6 @@ public class CargoTextArea extends JTextArea {
 
     /**
      * Outputs the container representation from the cargo manifest on the text area.
-     *
      */
     public void updateDisplay() {
     	//implementation here
