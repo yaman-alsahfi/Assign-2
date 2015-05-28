@@ -1,224 +1,459 @@
+package asgn2Tests;
 
-package asgn2Manifests;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
-import java.util.ArrayList;
+import java.util.regex.Pattern;
 
-import asgn2Codes.ContainerCode;
-import asgn2Containers.FreightContainer;
-import asgn2Exceptions.ManifestException;
+import javax.swing.JFrame;
+
+import org.fest.swing.edt.FailOnThreadViolationRepaintManager;
+import org.fest.swing.edt.GuiActionRunner;
+import org.fest.swing.edt.GuiQuery;
+import org.fest.swing.fixture.DialogFixture;
+import org.fest.swing.fixture.FrameFixture;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import asgn2GUI.CargoFrame;
+import asgn2GUI.CargoTextFrame;
 
 /**
- * A class for managing a container ship's cargo manifest.  It
- * allows freight containers of various types to be loaded and
- * unloaded, within various constraints.
- * <p>
- * In particular, the ship's captain has set the following rules
- * for loading of new containers:
- * <ol>
- * <li>
- * New containers may be loaded only if doing so does not exceed
- * the ship's weight limit.
- * </li>
- * <li>
- * New containers are to be loaded as close to the bridge as possible.
- * (Stack number zero is nearest the bridge.)
- * </li>
- * <li>
- * A new container may be added to a stack only if doing so will
- * not exceed the maximum allowed stack height.
- * <li>
- * A new container may be loaded only if a container with the same
- * code is not already on board.
- * </li>
- * <li>
- * Stacks of containers must be homogeneous, i.e., each stack must
- * consist of containers of one type (general,
- * refrigerated or dangerous goods) only.
- * </li>
- * </ol>
- * <p>
- * Furthermore, since the containers are moved by an overhead
- * crane, a container can be unloaded only if it is on top of
- * a stack.
- *  
- * @author fatimah-n8631000
- * @version 1.0
+ * Defines FEST Swing tests for use cases of the Cargo Manifest system.
+ *
+ * @author Malcolm Corney. Created 7 May 2015.
  */
-public class CargoManifest {
+public class CargoFrameTests {
 
-	private ArrayList<ArrayList<FreightContainer>> manifest;
-	private Integer maxHeight;
-	private Integer maxWeight;
-	private Integer currentWeight; // the current total weight of all containers
-	
-	/**
-	 * Constructs a new cargo manifest in preparation for a voyage.
-	 * When a cargo manifest is constructed the specific cargo
-	 * parameters for the voyage are set, including the number of
-	 * stack spaces available on the deck (which depends on the deck configuration
-	 * for the voyage), the maximum allowed height of any stack (which depends on
-	 * the weather conditions expected for the
-	 * voyage), and the total weight of containers allowed onboard (which depends
-	 * on the amount of ballast and fuel being carried).
-	 * 
-	 * @param numStacks the number of stacks that can be accommodated on deck
-	 * @param maxHeight the maximum allowable height of any stack
-	 * @param maxWeight the maximum weight of containers allowed on board 
-	 * (in tonnes)
-	 * @throws ManifestException if negative numbers are given for any of the
-	 * parameters
-	 */
-	public CargoManifest(Integer numStacks, Integer maxHeight, Integer maxWeight)
-	throws ManifestException {
-		if (numStacks <= 0 || maxHeight <= 0 || maxWeight <= 0)
-			throw new ManifestException("Numbers must not be negative");
-		
-		manifest = new ArrayList<ArrayList<FreightContainer>>(numStacks);
-		for (int i = 0; i < numStacks; i++)
-			manifest.add(new ArrayList<FreightContainer>());
-		this.maxHeight = maxHeight;
-		this.maxWeight = maxWeight;
-		this.currentWeight = 0;
-	}
+    private static final String MAXIMUM_WEIGHT = "Maximum Weight";
+    private static final String MAXIMUM_HEIGHT = "Maximum Height";
+    private static final String NUMBER_OF_STACKS = "Number of Stacks";
+    private static final String START_BARS = "|| ";
+    private static final String END_BARS = " ||";
+    private static final String START_FOUND_BARS = "||*";
+    private static final String END_FOUND_BARS = "*||";
+    private static final String NEW_LINE = "\n";
+    private static final String TEMPERATURE2 = "Temperature";
+    private static final String GOODS_CATEGORY = "Goods Category";
+    private static final String CONTAINER_WEIGHT = "Container Weight";
+    private static final String CONTAINER_CODE = "Container Code";
+    private static final String CONTAINER_INFORMATION = "Container Information";
+    private static final String CARGO_TEXT_AREA = "Cargo Text Area";
+    private static final String FIND = "Find";
+    private static final String NEW_MANIFEST = "New Manifest";
+    private static final String UNLOAD = "Unload";
+    private static final String LOAD = "Load";
+    private static final String CONTAINER_TYPE = "Container Type";
+    private static final String GENERAL_GOODS = "General Goods";
+    private static final String REFRIGERATED_GOODS = "Refrigerated Goods";
+    private static final String DANGEROUS_GOODS = "Dangerous Goods";
+    private static final String CATEGORY_2 = "2";
+    private static final String TEMPERATURE_MINUS_4 = "-4";
+    private static final String CODE_1 = "ABCU1234564";
+    private static final String CODE_2 = "ZZZU6549874";
+    private static final String CODE_3 = "JHGU1716760";
+    private static final String NEGATIVE = "-20";
+    private static final String NOT_NUMERIC = "A";
+    private static final String STACKS_1 = "1";
+    private static final String STACKS_3 = "3";
+    private static final String STACKS_5 = "5";
+    private static final String WEIGHT_20 = "20";
+    private static final String WEIGHT_30 = "30";
+    private static final String WEIGHT_80 = "80";
+    private static final String WEIGHT_100 = "100";
+    private static final String HEIGHT_1 = "1";
+    private static final String HEIGHT_5 = "5";
 
-	/**
-	 * Loads a freight container onto the ship, provided that it can be
-	 * accommodated within the five rules set by the captain.
-	 * 
-	 * @param newContainer the new freight container to be loaded
-	 * @throws ManifestException if adding this container would exceed
-	 * the ship's weight limit; if a container with the same code is
-	 * already on board; or if no suitable space can be found for this
-	 * container
-	 */
-	public void loadContainer(FreightContainer newContainer) throws ManifestException {
-		// check weight
-		if (currentWeight + newContainer.getGrossWeight() > maxWeight)
-			throw new ManifestException("Adding this container would exceed the ship's weight limit");
-		
-		// check exist
-		if (whichStack(newContainer.getCode()) != null)
-			throw new ManifestException("A container with the same code is already on board");
-		
-		// load container
-		for (int i = 0; i < manifest.size(); i++){
-			ArrayList<FreightContainer> currentStack = manifest.get(i);
-			if (currentStack.isEmpty()){
-				currentStack.add(newContainer);
-				currentWeight += newContainer.getGrossWeight(); 
-				return;
-			}
-			else if (currentStack.size() < maxHeight){
-				FreightContainer topContainer = currentStack.get(currentStack.size()-1);
-				if (topContainer.getClass() == newContainer.getClass()){
-					currentStack.add(newContainer);
-					currentWeight += newContainer.getGrossWeight();
-					return;
-				}
-			}
-		}
-		
-		// no suitable space can be found
-		throw new ManifestException("No suitable space can be found for this container");
-	}
+    private static final boolean USE_TEXT_VERSION = true;
+    private static final int NO_PAUSE = 0;
+    private static final int SHORT_PAUSE = 1500;
+    private static final int LONG_PAUSE = 3000;
 
-	/**
-	 * Unloads a particular container from the ship, provided that
-	 * it is accessible (i.e., on top of a stack).
-	 * 
-	 * @param containerId the code of the container to be unloaded
-	 * @throws ManifestException if the container is not accessible because
-	 * it's not on the top of a stack (including the case where it's not on board
-	 * the ship at all)
-	 */
-	public void unloadContainer(ContainerCode containerId) throws ManifestException {
-		Integer stackNo = whichStack(containerId);
-		if (stackNo == null)
-			throw new ManifestException("No such container");
-		
-		// check if the container is on top of a stack
-		Integer height = howHigh(containerId);
-		if (height < manifest.get(stackNo).size()-1)
-			throw new ManifestException("The container is not accessible");
-		
-		// unload it
-		FreightContainer removedContainer = manifest.get(stackNo).remove(height.intValue());
-		currentWeight -= removedContainer.getGrossWeight();
-	}
+    private static final Pattern CARGO_EXCEPTION_PATTERN = Pattern.compile("CargoException:.+");
+    private static final Pattern MANIFEST_EXCEPTION_PATTERN = Pattern.compile(".*ManifestException:.+");
 
-	
-	/**
-	 * Returns which stack holds a particular container, if any.  The
-	 * container of interest is identified by its unique
-	 * code.  Constant <code>null</code> is returned if the container is
-	 * not on board.
-	 * 
-	 * @param queryContainer the container code for the container of interest
-	 * @return the number of the stack with the container in it, or <code>null</code>
-	 * if the container is not on board
-	 */
-	public Integer whichStack(ContainerCode queryContainer) {
-		for (int i = 0; i < manifest.size(); i++){
-			ArrayList<FreightContainer> currentStack = manifest.get(i);
-			for (int j = 0; j < currentStack.size(); j++)
-				if (currentStack.get(j).getCode().equals(queryContainer)) // found
-					return i;
-		}
-		return null; // not found
-	}
+    private FrameFixture testFrame;
+    private JFrame frameUnderTest;
 
-	
-	/**
-	 * Returns how high in its stack a particular container is.  The container of
-	 * interest is identified by its unique code.  Height is measured in the
-	 * number of containers, counting from zero.  Thus the container at the bottom
-	 * of a stack is at "height" 0, the container above it is at height 1, and so on.
-	 * Constant <code>null</code> is returned if the container is
-	 * not on board.
-	 * 
-	 * @param queryContainer the container code for the container of interest
-	 * @return the container's height in the stack, or <code>null</code>
-	 * if the container is not on board
-	 */
-	public Integer howHigh(ContainerCode queryContainer) {
-		Integer stackNo = whichStack(queryContainer);
-		if (stackNo == null)
-			return null; // not found
-		
-		Integer height = null;
-		ArrayList<FreightContainer> currentStack = manifest.get(stackNo);
-		for (int j = 0; j < currentStack.size(); j++){
-			if (currentStack.get(j).getCode().equals(queryContainer)){ // found
-				height = j;
-				break;
-			}			
-		}
-		return height;
-	}
+    /**
+     * Turn on automated check to verify all Swing component updates are done in the Swing Event
+     * Dispatcher Thread (EDT). The EDT ensures that the application never loses responsiveness to
+     * user gestures.
+     */
+    @BeforeClass
+    public static void setUpOnce() {
+        FailOnThreadViolationRepaintManager.install();
+    }
 
+    /**
+     * Ensures that frame is launched through FEST to ensure the EDT is used properly. JUnit runs in
+     * its own thread.
+     */
+    @Before
+    public void setUp() {
+        if (USE_TEXT_VERSION) {
+            /* +----------------------------------------------+ */
+            /* | Use a CargoTextFrame to test the application | */
+            /* +----------------------------------------------+ */
+            frameUnderTest = GuiActionRunner.execute(new GuiQuery<CargoTextFrame>() {
+                @Override
+                protected CargoTextFrame executeInEDT() {
+                    CargoTextFrame cargo = new CargoTextFrame("Cargo Manifest 1.0");
+                    return cargo;
+                }
+            });
+        } else {
+            /* +------------------------------------------+ */
+            /* | Use a CargoFrame to test the application | */
+            /* +------------------------------------------+ */
+            frameUnderTest = GuiActionRunner.execute(new GuiQuery<CargoFrame>() {
+                @Override
+                protected CargoFrame executeInEDT() {
+                    CargoFrame cargo = new CargoFrame("Cargo Manifest 1.0");
+                    return cargo;
+                }
+            });
+        }
 
-	/**
-	 * Returns the contents of a particular stack as an array,
-	 * starting with the bottommost container at position zero in the array.
-	 * 
-	 * @param stackNo the number of the stack of interest
-	 * @return the stack's freight containers as an array
-	 * @throws ManifestException if there is no such stack on the ship
-	 */
-	public FreightContainer[] toArray(Integer stackNo) throws ManifestException {
-		if (stackNo == null || stackNo < 0 || stackNo >= manifest.size())
-			throw new ManifestException("There is no such stack on the ship");
-		
-		ArrayList<FreightContainer> currentStack = manifest.get(stackNo);
-		FreightContainer[] contents = new FreightContainer[currentStack.size()];
-		contents = currentStack.toArray(contents);
-		return contents;
-	}
+        // Choose one of the above JFrames to use as the test fixture.
+        testFrame = new FrameFixture(frameUnderTest);
+    }
 
-	/**
-	 * Returns the number of stacks
-	 * @return
-	 */
-	public int getNumStacks(){
-		return manifest.size();
-	}
+    /**
+     * Unload the frame and associated resources.
+     */
+    @After
+    public void tearDown() {
+        delay(SHORT_PAUSE);
+        testFrame.cleanUp();
+    }
+
+    /**
+     * Add a delay so that screen status can be viewed between tests.
+     * Select from NO_PAUSE, SHORT_PAUSE, LONG_PAUSE.
+     *
+     * @param milliseconds The amount of time fow which to pause.
+     */
+    private void delay(int milliseconds) {
+        try {
+            Thread.sleep(milliseconds);
+        } catch (InterruptedException exception) {
+            exception.printStackTrace();
+        }
+    }
+
+    /**
+     * Ensure the frame used for testing has been instantiated.
+     */
+    @Test
+    public void testConstruction() {
+        assertNotNull(testFrame);
+    }
+
+    /**
+     * Tests that only the "New Manifest" button is enabled when the application starts.
+     */
+    @Test
+    public void buttonStateAtStart() {
+        testFrame.button(NEW_MANIFEST).requireEnabled();
+        testFrame.button(LOAD).requireDisabled();
+        testFrame.button(UNLOAD).requireDisabled();
+        testFrame.button(FIND).requireDisabled();
+    }
+
+    /*
+     * Helper - Brings up a ManifestDilaog for further interaction in tests.
+     */
+    private DialogFixture prepareManifestDialog() {
+        testFrame.button(NEW_MANIFEST).click();
+        DialogFixture manifestFixture = testFrame.dialog(NEW_MANIFEST);
+        return manifestFixture;
+    }
+
+    /*
+     * Helper - Puts text in the relevant text areas of the ManifestDialog.
+     */
+    private void manifestDialogEnterText(DialogFixture dialog, String stacks, String height, String weight) {
+        if (stacks != null) {
+            dialog.textBox(NUMBER_OF_STACKS).enterText(stacks);
+        }
+        if (height != null) {
+            dialog.textBox(MAXIMUM_HEIGHT).enterText(height);
+        }
+        if (weight != null) {
+            dialog.textBox(MAXIMUM_WEIGHT).enterText(weight);
+        }
+        dialog.button("OK").click();
+    }
+
+    /**
+     * Tests for an error message when no text is entered in a ManifestDialog and "OK" is pressed.
+     */
+    @Test
+    public void newManifestNoData() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestFixture.button("OK").click();
+        testFrame.optionPane().requireErrorMessage();
+    }
+
+    /**
+     * Tests for an error message when non-numeric data is entered in "Number of Stacks" text field
+     * in a ManifestDialog.
+     */
+    @Test
+    public void newManifestInvalidStacks() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, NOT_NUMERIC, null, null);
+        manifestFixture.optionPane().requireErrorMessage();
+    }
+
+    /**
+     * Tests for an error message when non-numeric data is entered in "Max Stack Height" text
+     * field in a ManifestDialog.
+     */
+    @Test
+    public void newManifestValidStacksInvalidHeight() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, STACKS_5, NOT_NUMERIC, null);
+        manifestFixture.optionPane().requireErrorMessage();
+    }
+
+    /**
+     * Tests for an error message when non-numeric data is entered in "Max Weight" text
+     * field in a ManifestDialog.
+     */
+    @Test
+    public void newManifestValidStacksValidHeightInvalidWeight() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, STACKS_5, HEIGHT_5, NOT_NUMERIC);
+        manifestFixture.optionPane().requireErrorMessage();
+    }
+
+    /**
+     * Tests for an error message when negative data is entered in "Number of Stacks" text
+     * field in a ManifestDialog.
+     */
+    @Test
+    public void newManifestNegativeStacks() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, NEGATIVE, HEIGHT_5, WEIGHT_100);
+        manifestFixture.optionPane().requireErrorMessage();
+        manifestFixture.optionPane().requireMessage(MANIFEST_EXCEPTION_PATTERN);
+    }
+
+    /**
+     * Tests for an error message when negative data is entered in "Max Stack Height" text
+     * field in a ManifestDialog.
+     */
+    @Test
+    public void newManifestNegativeHeight() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, STACKS_5, NEGATIVE, WEIGHT_100);
+        manifestFixture.optionPane().requireErrorMessage();
+        manifestFixture.optionPane().requireMessage(MANIFEST_EXCEPTION_PATTERN);
+    }
+
+    /**
+     * Tests for an error message when negative data is entered in "Max Weight" text
+     * field in a ManifestDialog.
+     */
+    @Test
+    public void newManifestNegativeWeight() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, STACKS_5, HEIGHT_5, NEGATIVE);
+        manifestFixture.optionPane().requireErrorMessage();
+        manifestFixture.optionPane().requireMessage(MANIFEST_EXCEPTION_PATTERN);
+    }
+
+    /**
+     * Tests that all buttons are enabled on the window after a valid CargoManifest has been
+     * created.
+     */
+    @Test
+    public void newManifestValidDataButtonCheck() {
+        DialogFixture manifestFixture = prepareManifestDialog();
+        manifestDialogEnterText(manifestFixture, STACKS_5, HEIGHT_5, WEIGHT_100);
+        testFrame.button(NEW_MANIFEST).requireEnabled();
+        testFrame.button(LOAD).requireEnabled();
+        testFrame.button(UNLOAD).requireEnabled();
+        testFrame.button(FIND).requireEnabled();
+    }
+
+    /**
+     * Tests that the Cargo Text Area holds the correct string representation for a single empty
+     * stack.
+     */
+    @Test
+    public void newManifestOneEmptyStack() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_1, HEIGHT_1, WEIGHT_100);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /**
+     * Tests that the Cargo Text Area holds the correct string representation for three empty
+     * stacks.
+     */
+    @Test
+    public void newManifestThreeEmptyStacks() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_3, HEIGHT_1, WEIGHT_100);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + END_BARS + NEW_LINE
+                    + START_BARS + END_BARS + NEW_LINE
+                    + START_BARS + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /*
+     * Helper - Enters data into a Create Manifest dialog
+     */
+    private void loadContainer(String containerType, String code, String weight,
+            String goodsCat, String temperature) {
+        testFrame.button(LOAD).click();
+        DialogFixture containerDialog = testFrame.dialog(CONTAINER_INFORMATION);
+        containerDialog.comboBox(CONTAINER_TYPE).selectItem(containerType);
+        containerDialog.textBox(CONTAINER_CODE).enterText(code);
+        containerDialog.textBox(CONTAINER_WEIGHT).enterText(weight);
+        if (containerType.equals(DANGEROUS_GOODS)) {
+            containerDialog.textBox(GOODS_CATEGORY).enterText(goodsCat);
+        } else if (containerType.equals(REFRIGERATED_GOODS)) {
+            containerDialog.textBox(TEMPERATURE2).enterText(temperature);
+        }
+        containerDialog.button("OK").click();
+    }
+
+    /**
+     * Tests that a valid General Goods container is added and displayed.
+     */
+    @Test
+    public void addGeneralGoods() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_1, HEIGHT_1, WEIGHT_30);
+        loadContainer(GENERAL_GOODS, CODE_1, WEIGHT_20, null, null);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_1 + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /**
+     * Tests that a valid Dangerous Goods container is added and displayed.
+     */
+    @Test
+    public void addDangerousGoods() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_1, HEIGHT_1, WEIGHT_30);
+        loadContainer(DANGEROUS_GOODS, CODE_3, WEIGHT_20, CATEGORY_2, null);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_3 + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /**
+     * Tests that a valid Refrigerated Goods container is added and displayed.
+     */
+    @Test
+    public void addRefrigeratedGoods() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_1, HEIGHT_1, WEIGHT_30);
+        loadContainer(REFRIGERATED_GOODS, CODE_2, WEIGHT_20, null, TEMPERATURE_MINUS_4);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_2 + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /**
+     * Tests that one valid container of each container type is added to the canvas.
+     */
+    @Test
+    public void addOneOfEach() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_3, HEIGHT_1, WEIGHT_100);
+        loadContainer(GENERAL_GOODS, CODE_1, WEIGHT_20, null, null);
+        loadContainer(REFRIGERATED_GOODS, CODE_2, WEIGHT_20, null, TEMPERATURE_MINUS_4);
+        loadContainer(DANGEROUS_GOODS, CODE_3, WEIGHT_20, CATEGORY_2, null);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_1 + END_BARS + NEW_LINE
+                    + START_BARS + CODE_2 + END_BARS + NEW_LINE
+                    + START_BARS + CODE_3 + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /**
+     * Tests that adding three 30 tonne containers overloads a manifest of 80 tonnes.
+     */
+    @Test
+    public void overLoad() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_3, HEIGHT_1, WEIGHT_80);
+        loadContainer(GENERAL_GOODS, CODE_1, WEIGHT_30, null, null);
+        loadContainer(REFRIGERATED_GOODS, CODE_2, WEIGHT_30, null, TEMPERATURE_MINUS_4);
+        loadContainer(DANGEROUS_GOODS, CODE_3, WEIGHT_30, CATEGORY_2, null);
+        testFrame.optionPane().requireErrorMessage();
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_1 + END_BARS + NEW_LINE
+                    + START_BARS + CODE_2 + END_BARS + NEW_LINE
+                    + START_BARS + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /*
+     * Helper - Clicks the Unload button and enters a valid container code.
+     */
+    private void unloadContainer(String code) {
+        testFrame.button(UNLOAD).click();
+        DialogFixture containerDialog = testFrame.dialog("Container Dialog");
+        containerDialog.textBox(CONTAINER_CODE).enterText(code);
+        containerDialog.button("OK").click();
+    }
+
+    /**
+     * Tests that a loaded container can then be unloaded.
+     */
+    @Test
+    public void loadGeneralGoodsThenUnload() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_1, HEIGHT_1, WEIGHT_30);
+        loadContainer(GENERAL_GOODS, CODE_1, WEIGHT_20, null, null);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_1 + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+        unloadContainer(CODE_1);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+
+    /*
+     * Helper - Clicks the Find button and enters a valid container code.
+     */
+    private void findContainer(String code) {
+        testFrame.button(FIND).click();
+        DialogFixture containerDialog = testFrame.dialog("Container Dialog");
+        containerDialog.textBox(CONTAINER_CODE).enterText(code);
+        containerDialog.button("OK").click();
+    }
+
+    /**
+     * Tests that a loaded container can then be unloaded.
+     */
+    @Test
+    public void loadGeneralGoodsThenFind() {
+        manifestDialogEnterText(prepareManifestDialog(), STACKS_1, HEIGHT_1, WEIGHT_30);
+        loadContainer(GENERAL_GOODS, CODE_1, WEIGHT_20, null, null);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_BARS + CODE_1 + END_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+        findContainer(CODE_1);
+        if (frameUnderTest instanceof CargoTextFrame) {
+            String expected = START_FOUND_BARS + CODE_1 + END_FOUND_BARS + NEW_LINE;
+            assertEquals(expected, testFrame.textBox(CARGO_TEXT_AREA).text());
+        }
+    }
+}
